@@ -1,10 +1,11 @@
 #!/usr/bin/perl
-#
-# Schema
-#	CREATE TABLE 'tasks' ( id INTEGER PRIMARY KEY AUTOINCREMENT, checked BOOLEAN, verkackt BOOLEAN, task TEXT, modified TEXT, created TEXT);
-#	CREATE TRIGGER update_tasks AFTER UPDATE ON tasks FOR EACH ROW BEGIN UPDATE tasks SET modified = DATETIME('NOW') WHERE id = NEW.id; END;
-#	CREATE TRIGGER insert_tasks AFTER INSERT ON tasks FOR EACH ROW BEGIN UPDATE tasks SET created = DATETIME('NOW') WHERE id = NEW.id; END;
-#
+=schema
+	CREATE TABLE 'tasks' ( id INTEGER PRIMARY KEY AUTOINCREMENT, checked BOOLEAN, verkackt BOOLEAN, task TEXT, modified TEXT, created TEXT);
+	CREATE TRIGGER update_tasks AFTER UPDATE ON tasks FOR EACH ROW BEGIN UPDATE tasks SET modified = DATETIME('NOW') WHERE id = NEW.id; END;
+	CREATE TRIGGER insert_tasks AFTER INSERT ON tasks FOR EACH ROW BEGIN UPDATE tasks SET created = DATETIME('NOW') WHERE id = NEW.id; END;
+
+=cut
+
 # TODO: Fix UTF-8 Errors
 # TODO: Introduce short names for operations
 
@@ -17,7 +18,6 @@ binmode(STDOUT, ":utf8");
 
 
 my $dbh = DBI->connect("dbi:SQLite:dbname=$ENV{HOME}/.tasks.sqlite", "", "",);
-
 
 my %commands = (
 	list => sub {
@@ -80,15 +80,31 @@ my %commands = (
 		}
 	},
 
-	#help => sub {
-	#	print "Commands: replace (rp), toogle (t), add (a), remove (rm), help\n";
-	#}
+	help => \&help,
 );
+
+sub help {
+	print "Commands:\n";
+
+	foreach my $cmd (sort keys %commands) {
+		$cmd =~ s/^(.)(.*)$/(\1)\2/;
+		print " ", $cmd, "\n";
+	}
+}
 
 my $cmd = shift @ARGV;
 
 if( not defined $cmd ) {
 	$commands{list}();
+	exit;
+}
+
+my @cand = grep(/^$cmd/, sort keys %commands);
+
+if(@cand > 1) {
+	print STDERR "Ambiguous command, candidates are: " . join(", ", @cand), "\n";
+} elsif(@cand == 0) {
+	help;
 } else {
-	$commands{$cmd}();
+	$commands{$cand[0]}();
 }
