@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+#
+# Schema
+#	CREATE TABLE 'tasks' ( id INTEGER PRIMARY KEY AUTOINCREMENT, checked BOOLEAN, verkackt BOOLEAN, task TEXT, modified TEXT, created TEXT);
+#	CREATE TRIGGER update_tasks AFTER UPDATE ON tasks FOR EACH ROW BEGIN UPDATE tasks SET modified = DATETIME('NOW') WHERE id = NEW.id; END;
+#	CREATE TRIGGER insert_tasks AFTER INSERT ON tasks FOR EACH ROW BEGIN UPDATE tasks SET created = DATETIME('NOW') WHERE id = NEW.id; END;
+#
+# TODO: Fix UTF-8 Errors
+# TODO: Introduce short names for operations
+
+use strict;
+use utf8;
+use DBI;
+use Term::ANSIColor;
+
+binmode(STDOUT, ":utf8");
+
+
+my $dbh = DBI->connect("dbi:SQLite:dbname=$ENV{HOME}/.tasks.sqlite", "", "",);
+
+
+my %commands = (
+	list => sub {
+		my $modifier = "WHERE checked = 0";
+
+		# remove constraint to see all entries
+		if( @ARGV && shift @ARGV == "all" ) {
+			$modifier = ""
+		}
+
+		my $result = $dbh->selectall_arrayref("SELECT * FROM tasks $modifier", { Slice => {} });
+		
+		foreach my $task ( @$result ) {
+			if ( $task->{checked} == "1" ) {
+				print colored( "✔", "bold green" );
+			} else {
+				print colored( "✘", "bold red" );
+			}
+
+			utf8::decode($task->{task});
+			print colored(" $task->{task} ", $task->{verkackt} == "1" ? "underline yellow" : "");
+			print "[#", colored( "$task->{id}", "bold yellow" ), "]\n";
+		}
+	},
+
+	replace => sub {
+		my $id = shift @ARGV;
+		$dbh->do("UPDATE tasks SET task = ? WHERE id = ?", undef, join(" ", @ARGV), $id);
+	},
+
+	toggle => sub {
+		foreach( @ARGV ) {
+			$dbh->do("UPDATE tasks SET checked = NOT checked  WHERE id = ?", undef, $_);
+		}
+	},
+
+	add => sub {
+		$dbh->do("INSERT INTO tasks (task, checked, verkackt) VALUES (?, 0, 0)", undef, join(" ", @ARGV));
+	},
+
+	remove => sub {
+		foreach( @ARGV ) {
+			$dbh->do("DELETE FROM tasks WHERE id = ?", undef, $_);
+		}
+	},
+
+	info => sub {
+		my $result = $dbh->selectrow_hashref("SELECT COUNT(checked) AS todo, SUM(checked) AS done FROM tasks");
+		print colored($result->{todo}, "bold white");
+	        print " tasks, ";
+		print colored($result->{done}, "bold green");
+		print " done and ";
+		print colored($result->{todo}-$result->{done}, "bold red");
+	        print " unfinished.\n";
+	},
+
+	verkackt => sub {
+		foreach( @ARGV ) {
+			$dbh->do("UPDATE tasks SET verkackt = NOT verkackt WHERE id = ?", undef, $_);
+		}
+	},
+
+	#help => sub {
+	#	print "Commands: replace (rp), toogle (t), add (a), remove (rm), help\n";
+	#}
+);
+
+my $cmd = shift @ARGV;
+
+if( not defined $cmd ) {
+	$commands{list}();
+} else {
+	$commands{$cmd}();
+}
