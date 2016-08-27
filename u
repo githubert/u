@@ -29,7 +29,7 @@ my %commands = (
 		}
 
 		my $result = $dbh->selectall_arrayref("SELECT * FROM tasks $modifier", { Slice => {} });
-		
+
 		foreach my $task ( @$result ) {
 			if ( $task->{checked} == "1" ) {
 				print colored( "✔", "bold green" );
@@ -38,7 +38,7 @@ my %commands = (
 			}
 
 			utf8::decode($task->{task});
-			print colored(" $task->{task} ", $task->{verkackt} == "1" ? "underline yellow" : "");
+			print colored(" $task->{task} ", $task->{verkackt} == "1" ? "underline yellow" : "reset");
 			print "[#", colored( "$task->{id}", "bold yellow" ), "]\n";
 		}
 	},
